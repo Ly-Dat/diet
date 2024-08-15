@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <style>
+        .container {
+            display: flex;
+            justify-content: space-between;
+        }
+    
+        .form-container {
+            width: 45%;
+        }
+    
+        .table-container {
+            width: 50%;
+        }
+    
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+    
+        table, th, td {
+            border: 1px solid black;
+        }
+    
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+    
+        /* Đặt chiều rộng tối thiểu cho cột ngày */
+        td:nth-child(5) {
+            min-width: 120px; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Dashboard</h1>
+    
+    <div class="container">
+        <!-- Form Container -->
+        <div class="form-container">
+            <h2>Add Food Log</h2>
+            <form id="food-form" method="post">
+                <input type="text" name="food" placeholder="Name of food" required>
+                <input type="float" name="quantity" placeholder="quantity" required>
+                <select id="number-gam" name="number-gam">
+                    <option value="number">number</option>
+                    <option value="gam">gram</option>
+                </select>
+                <input type="float" name="calories" placeholder="calories of each number or 100g" required>
+                <input type="date" name="date" required>
+                <button type="submit">Add</button>
+            </form>
+
+            <h2>Calculate Daily Calories</h2>
+            <input type="date" id="calorie-date" required>
+            <button id="calculate-calories" data-user-id="{{ user_id }}">Calculate</button>
+            <p id="calorie-result"></p>
+        </div>
+
+        <!-- Table Container -->
+        <div class="table-container">
+            <h2>Food Log</h2>
+            <table id="food-log">
+                <thead>
+                    <tr>
+                        <th>Food</th>
+                        <th>Quantity</th>
+                        <th>Unit</th>
+                        <th>Calories</th>
+                        <th>Date</th>
+                        <th>Action</th> <!-- Cột mới cho nút Delete -->
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data rows will be appended here -->
+                </tbody>
+            </table>
+        </div>
+        
+        <script>
+            // Handle calculating daily calories
+            $('#calculate-calories').on('click', function() {
+                const userId = $(this).data('user-id');
+                const selectedDate = $('#calorie-date').val();
+        
+                if (selectedDate) {
+                    $.ajax({
+                        url: '/api/get_daily_calories',
+                        method: 'GET',
+                        data: { user_id: userId, date: selectedDate },
+                        success: function(response) {
+                            // Hiển thị tổng lượng calo
+                            $('#calorie-result').text(`Total Calories: ${response.total_calories.toFixed(2)} (calo)`);
+        
+                            // Cập nhật bảng với food logs
+                            const tbody = $('#food-log tbody');
+                            tbody.empty(); // Xóa các dòng cũ trong bảng
+        
+                            // Thêm các log mới vào bảng
+                            response.food_logs.forEach(function(log) {
+                                tbody.append(`
+                                    <tr data-log-id="${log.log_id}">
+                                        <td>${log.food}</td>
+                                        <td>${log.quantity}</td>
+                                        <td>${log.unit}</td>
+                                        <td>${log.calories}</td>
+                                        <td>${log.date}</td>
+                                        <td><button class="delete-log">Delete</button></td>
+                                    </tr>
+                                `);
+                            });
+        
+                            // Gán sự kiện click cho nút Delete
+                            $('.delete-log').on('click', function() {
+                                const row = $(this).closest('tr');
+                                const logId = row.data('log-id');
+        
+                                // Xác nhận trước khi xóa
+                                if (confirm('Are you sure to delete it?')) {
+                                    $.ajax({
+                                        url: '/api/delete_food_log',
+                                        method: 'POST',
+                                        contentType: 'application/json',
+                                        data: JSON.stringify({ log_id: logId }),
+                                        success: function(response) {
+                                            if (response.success) {
+                                                row.remove(); // Xóa dòng khỏi bảng nếu thành công
+                                            } else {
+                                                alert('Failed to delete log');
+                                            }
+                                        },
+                                        error: function() {
+                                            alert('Error deleting log');
+                                        }
+                                    });
+                                }
+                            });
+                        },
+                        error: function() {
+                            $('#calorie-result').text('Error calculating calories.');
+                        }
+                    });
+                } else {
+                    $('#calorie-result').text('Please select a date.');
+                }
+            });
+        </script>
+</body>
+</html>
